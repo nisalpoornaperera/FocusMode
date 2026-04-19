@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Focus Mode</title>
+<style>
+:root {
+  --bg: #000000;
+  --card: #1c1c1e;
+  --card2: #2c2c2e;
+  --green: #30d158;
+  --blue: #0a84ff;
+  --red: #ff453a;
+  --orange: #ff9f0a;
+  --yellow: #ffd60a;
+  --cyan: #64d2ff;
+  --pink: #ff375f;
+  --purple: #bf5af2;
+  --text: #ffffff;
+  --text2: rgba(235,235,245,0.6);
+  --text3: rgba(235,235,245,0.3);
+  --radius: 16px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  height: 100vh;
+}
+
+/* ===== PIN LOCK SCREEN ===== */
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.lock-screen.hidden { display: none; }
+.lock-icon { font-size: 56px; margin-bottom: 16px; }
+.lock-title { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+.lock-subtitle { color: var(--text2); font-size: 14px; margin-bottom: 32px; }
+.pin-dots {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 32px;
+}
+.pin-dot {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--text3);
+  background: transparent;
+  transition: all 0.2s;
+}
+.pin-dot.filled { background: var(--text); border-color: var(--text); }
+.pin-dot.error { border-color: var(--red); background: var(--red); }
+.pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
+  gap: 12px;
+}
+.pin-key {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  font-size: 28px;
+  font-weight: 300;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  user-select: none;
+}
+.pin-key:hover { background: rgba(255,255,255,0.12); }
+.pin-key:active { background: rgba(255,255,255,0.2); }
+.pin-key.letters { font-size: 10px; letter-spacing: 2px; margin-top: 4px; }
+.pin-key-sub { color: var(--text3); font-size: 9px; letter-spacing: 1.5px; display: block; margin-top: -2px; }
+.pin-key.empty { border: none; background: none; cursor: default; }
+.pin-key.backspace { font-size: 22px; border: none; background: none; }
+.pin-error-msg { color: var(--red); font-size: 13px; margin-top: 16px; min-height: 20px; }
+
+/* ===== MAIN APP CONTAINER ===== */
+.app {
+  width: 100%;
+  padding: 12px clamp(16px, 3vw, 32px) 8px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dashboard-page { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+#tab-summary, #tab-tasks, #tab-apps, #tab-blocking { flex: 1; overflow-y: auto; min-height: 0; padding-bottom: 8px; }
+#tab-summary::-webkit-scrollbar, #tab-tasks::-webkit-scrollbar,
+#tab-apps::-webkit-scrollbar, #tab-blocking::-webkit-scrollbar { width: 4px; }
+#tab-summary::-webkit-scrollbar-thumb, #tab-tasks::-webkit-scrollbar-thumb,
+#tab-apps::-webkit-scrollbar-thumb, #tab-blocking::-webkit-scrollbar-thumb { background: var(--card2); border-radius: 4px; }
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.header h1 { font-size: clamp(24px, 4vw, 32px); font-weight: 700; }
+.header .date { color: var(--text2); font-size: 13px; margin-bottom: 2px; }
+.settings-btn {
+  background: var(--card);
+  border: none;
+  color: var(--text);
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.settings-btn:hover { background: var(--card2); }
+
+/* Navigation Tabs */
+.nav-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--card);
+  border-radius: 12px;
+  padding: 3px;
+  margin-bottom: 20px;
+}
+.nav-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text2);
+  padding: 10px 4px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.nav-tab.active { background: var(--card2); color: var(--text); }
+
+/* Screen Time Graph */
+.graph-section {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.graph-section::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--green), var(--blue), var(--cyan));
+  background-size: 200% 100%;
+  animation: borderFlow 4s ease infinite;
+}
+.graph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.graph-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.graph-title { font-size: 14px; font-weight: 600; color: var(--text2); }
+.graph-time {
+  font-size: clamp(28px, 5vw, 38px);
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffffff 30%, #64d2ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.graph-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.graph-canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: 140px;
+}
+.graph-canvas-wrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.graph-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  justify-content: center;
+}
+.graph-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text2);
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.legend-dot.screen { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.legend-dot.social { background: var(--blue); box-shadow: 0 0 6px var(--blue); }
+.legend-dot.focus { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+
+/* Health Badge */
+.health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.health-badge.healthy { background: rgba(48,209,88,0.13); color: var(--green); }
+.health-badge.moderate { background: rgba(255,159,10,0.13); color: var(--orange); }
+.health-badge.unhealthy { background: rgba(255,69,58,0.13); color: var(--red); }
+
+/* Stats Row */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 16px 12px;
+  text-align: center;
+}
+.stat-card .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card .stat-value { font-size: clamp(18px, 3vw, 24px); font-weight: 700; margin-top: 4px; }
+.stat-card .stat-sub { color: var(--text3); font-size: 11px; margin-top: 2px; }
+.stat-label-green { color: var(--green); }
+.stat-label-blue { color: var(--blue); }
+.stat-label-cyan { color: var(--cyan); }
+
+/* Card */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 14px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.card-title { font-size: 15px; font-weight: 600; }
+
+/* Social progress */
+.social-pct { color: var(--text2); font-size: 13px; }
+.social-progress-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
+.social-used { color: var(--blue); }
+.social-left { color: var(--text3); }
+
+/* Progress Bar */
+.progress-track { width: 100%; height: 5px; background: var(--card2); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+.progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s; width: 0%; background: var(--blue); }
+
+/* Bar Chart */
+.bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 100px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.bar { width: 100%; border-radius: 5px; min-height: 3px; transition: height 0.5s; }
+.bar-label { color: var(--text3); font-size: 10px; }
+
+/* App List */
+.app-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.app-item:last-child { border-bottom: none; }
+.app-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; background: var(--card2); }
+.app-info { flex: 1; min-width: 0; }
+.app-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-cat { color: var(--text3); font-size: 11px; }
+.app-time { font-size: 14px; font-weight: 600; color: var(--text2); flex-shrink: 0; }
+.app-empty { color: var(--text3); text-align: center; padding: 20px; font-size: 13px; }
+
+/* Status */
+.status-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.status-row:last-child { border-bottom: none; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.active { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.status-dot.blocked { background: var(--red); box-shadow: 0 0 8px var(--red); }
+.status-label { flex: 1; font-size: 14px; }
+.status-value { color: var(--text2); font-size: 13px; flex-shrink: 0; }
+
+/* Info text */
+.info-text { color: var(--text2); font-size: 13px; line-height: 1.7; }
+.info-text p { margin-bottom: 6px; }
+.info-text p:last-child { margin-bottom: 0; }
+
+/* Hidden tab */
+.tab-hidden { display: none !important; }
+
+/* Settings Page */
+.settings-page { display: none; }
+.settings-page.visible { display: flex; flex-direction: column; flex: 1; overflow-y: auto; }
+.dashboard-page.hidden { display: none; }
+.settings-title { font-size: clamp(20px, 4vw, 24px); }
+.settings-spacer { width: 60px; }
+
+.setting-group { margin-bottom: 18px; }
+.setting-group h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text3); margin-bottom: 8px; padding: 0 4px; }
+.setting-row { display: flex; justify-content: space-between; align-items: center; padding: 13px 16px; background: var(--card); margin-bottom: 1px; }
+.setting-row-first { border-radius: var(--radius) var(--radius) 0 0; }
+.setting-row-last { border-radius: 0 0 var(--radius) var(--radius); margin-bottom: 0; }
+.setting-row-only { border-radius: var(--radius); }
+.setting-label { font-size: 14px; }
+.setting-input { background: var(--card2); border: none; color: var(--text); padding: 8px 10px; border-radius: 8px; width: 90px; text-align: right; font-size: 14px; }
+
+.toggle { width: 48px; height: 28px; background: #48484a; border-radius: 14px; border: none; cursor: pointer; position: relative; transition: background 0.3s; flex-shrink: 0; }
+.toggle.on { background: var(--green); }
+.toggle::after { content: ''; width: 24px; height: 24px; background: white; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: transform 0.3s; }
+.toggle.on::after { transform: translateX(20px); }
+
+.back-btn { background: none; border: none; color: var(--blue); font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+
+/* Input rows */
+.add-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.add-input { flex: 1; background: var(--card2); border: none; color: var(--text); padding: 10px 14px; border-radius: 10px; font-size: 14px; outline: none; min-width: 0; }
+.add-input::placeholder { color: var(--text3); }
+.add-btn { border: none; color: var(--text); padding: 10px 16px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: opacity 0.2s; }
+.add-btn:hover { opacity: 0.85; }
+.add-btn-green { background: var(--green); color: var(--bg); }
+.add-btn-blue { background: var(--blue); }
+.add-btn-purple { background: var(--purple); }
+
+/* Custom sites */
+.custom-site-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.custom-site-item:last-child { border-bottom: none; }
+.custom-site-domain { font-size: 14px; }
+.custom-site-remove { background: none; border: none; color: var(--red); font-size: 16px; cursor: pointer; padding: 4px 8px; }
+.empty-state { color: var(--text3); font-size: 13px; text-align: center; padding: 16px; }
+
+/* Task / Goal items */
+.item-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.item-row:last-child { border-bottom: none; }
+.item-check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--text3); background: none; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: transparent; transition: all 0.2s; }
+.item-check.done { background: var(--green); border-color: var(--green); color: var(--bg); }
+.item-check.goal { border-radius: 6px; }
+.item-check.goal.done { background: var(--purple); border-color: var(--purple); color: var(--text); }
+.item-text { flex: 1; font-size: 14px; min-width: 0; word-break: break-word; }
+.item-text.done { color: var(--text3); text-decoration: line-through; }
+.item-delete { background: none; border: none; color: var(--text3); font-size: 14px; cursor: pointer; padding: 4px 6px; flex-shrink: 0; }
+.item-delete:hover { color: var(--red); }
+
+/* Task progress */
+.task-progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.task-pct { font-size: 13px; font-weight: 600; }
+.task-count { color: var(--text2); font-size: 13px; }
+
+/* Reward Banner — Futuristic */
+.reward-banner {
+  position: relative;
+  background: linear-gradient(135deg, rgba(10,12,28,0.95), rgba(15,20,50,0.95));
+  border: none;
+  border-radius: var(--radius);
+  padding: 22px 20px;
+  margin-bottom: 14px;
+  text-align: center;
+  overflow: hidden;
+  z-index: 0;
+}
+.reward-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  padding: 1.5px;
+  background: linear-gradient(135deg, #30d158, #0a84ff, #bf5af2, #64d2ff, #ffd60a, #30d158);
+  background-size: 400% 400%;
+  animation: borderFlow 5s ease infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  z-index: -1;
+}
+.reward-banner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(100,210,255,0.07), transparent);
+  animation: sweepGlow 4s ease-in-out infinite;
+  pointer-events: none;
+}
+.reward-banner.weekly::before {
+  background: linear-gradient(135deg, #bf5af2, #ff375f, #ffd60a, #30d158, #0a84ff, #bf5af2);
+  background-size: 400% 400%;
+  animation: borderFlow 5s ease infinite;
+}
+.reward-icon { font-size: 42px; margin-bottom: 8px; filter: drop-shadow(0 0 14px rgba(255,214,10,0.5)); }
+.reward-title { font-size: 17px; font-weight: 700; margin-bottom: 5px; letter-spacing: 0.5px; }
+.reward-msg { color: var(--text2); font-size: 13px; line-height: 1.55; }
+@keyframes borderFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes sweepGlow {
+  0% { left: -80%; }
+  100% { left: 180%; }
+}
+
+/* AI Review Card */
+.ai-review-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(10,15,30,0.95), rgba(8,12,25,0.95));
+  border: 1px solid rgba(100,210,255,0.12);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.ai-review-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #30d158, #0a84ff, #64d2ff, #bf5af2);
+  background-size: 200% 100%;
+  animation: borderFlow 3s ease infinite;
+}
+.ai-review-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.ai-badge {
+  background: linear-gradient(135deg, #0a84ff, #64d2ff);
+  color: #000;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 1px;
+}
+.ai-review-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+.ai-refresh-btn {
+  background: none;
+  border: 1px solid rgba(100,210,255,0.2);
+  color: var(--text2);
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+.ai-refresh-btn:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: rgba(100,210,255,0.05);
+}
+.ai-refresh-btn.spinning { animation: spin 0.6s ease; }
+.ai-review-text {
+  color: rgba(235,235,245,0.75);
+  font-size: 13px;
+  line-height: 1.7;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Streak */
+.streak-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; background: rgba(255,159,10,0.13); color: var(--orange); margin-top: 6px; }
+.streak-badge.none { background: var(--card2); color: var(--text3); }
+
+/* Google Calendar */
+.gcal-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+.gcal-btn:hover { opacity: 0.85; }
+.gcal-connect { background: #4285f4; color: #fff; }
+.gcal-disconnect { background: var(--card2); color: var(--red); }
+.gcal-sync { background: var(--green); color: var(--bg); }
+.gcal-status { display: flex; align-items: center; gap: 8px; padding: 10px 0; font-size: 13px; }
+.gcal-status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.gcal-status-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.gcal-status-dot.disconnected { background: var(--text3); }
+.gcal-actions { display: flex; gap: 8px; margin-top: 10px; }
+.gcal-actions .gcal-btn { flex: 1; }
+.gcal-info { color: var(--text3); font-size: 12px; margin-top: 8px; line-height: 1.5; }
+.gcal-section-box { background: var(--card); border-radius: var(--radius); padding: 16px; }
+.gcal-url-row { margin-bottom: 8px; }
+.gcal-events-wrap { margin-bottom: 10px; }
+.mt-10 { margin-top: 10px; }
+.setting-row-wrap { flex-wrap: wrap; gap: 10px; }
+
+/* PIN settings */
+.pin-setting-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.pin-setting-btn:hover { opacity: 0.85; }
+.pin-setting-btn.set { background: var(--blue); color: var(--text); }
+.pin-setting-btn.remove { background: var(--card2); color: var(--red); }
+.pin-setup-row { display: flex; align-items: center; gap: 10px; }
+.pin-setup-input {
+  background: var(--card2);
+  border: none;
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  width: 120px;
+  font-size: 14px;
+  letter-spacing: 6px;
+  text-align: center;
+  -webkit-text-security: disc;
+}
+.pin-setup-input::placeholder { letter-spacing: normal; }
+.pin-status-text { color: var(--text2); font-size: 13px; }
+
+/* Responsive layout for wider screens */
+@media (min-width: 800px) {
+  .header { margin-bottom: 10px; }
+  .nav-tabs { margin-bottom: 10px; }
+  .summary-layout { display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: start; }
+  .summary-left { display: flex; flex-direction: column; align-items: center; }
+  .summary-right { display: flex; flex-direction: column; }
+  .ring-section { margin-bottom: 0; }
+  .summary-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .summary-left { display: flex; flex-direction: column; }
+  .summary-right { display: flex; flex-direction: column; }
+  .graph-section { margin-bottom: 0; }
+  .graph-canvas-wrap { height: 180px; }
+  .stats-row { gap: 10px; margin-bottom: 10px; }
+  .stat-card { padding: 14px 10px; }
+  .card { padding: 14px; margin-bottom: 10px; }
+  .card:last-child { margin-bottom: 0; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .two-col .card { margin-bottom: 0; }
+  .bar-chart { height: 80px; }
+  .reward-banner { padding: 16px; margin-bottom: 10px; }
+  .reward-icon { font-size: 32px; margin-bottom: 4px; }
+  .reward-title { font-size: 15px; margin-bottom: 2px; }
+  .ai-review-card { padding: 14px; margin-bottom: 10px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== PIN LOCK SCREEN ===== -->
+<div class="lock-screen hidden" id="lockScreen">
+  <div class="lock-icon">&#128274;</div>
+  <div class="lock-title">Focus Mode</div>
+  <div class="lock-subtitle">Enter your PIN to unlock</div>
+  <div class="pin-dots" id="pinDots">
+    <div class="pin-dot"></div>
+    <div class="pin-dot"></div>
+    <div class="pin-dot"></div>
+    <div class="pin-dot"></div>
+  </div>
+  <div class="pin-pad">
+    <button type="button" class="pin-key" onclick="pinPress('1')">1</button>
+    <button type="button" class="pin-key" onclick="pinPress('2')">2</button>
+    <button type="button" class="pin-key" onclick="pinPress('3')">3</button>
+    <button type="button" class="pin-key" onclick="pinPress('4')">4</button>
+    <button type="button" class="pin-key" onclick="pinPress('5')">5</button>
+    <button type="button" class="pin-key" onclick="pinPress('6')">6</button>
+    <button type="button" class="pin-key" onclick="pinPress('7')">7</button>
+    <button type="button" class="pin-key" onclick="pinPress('8')">8</button>
+    <button type="button" class="pin-key" onclick="pinPress('9')">9</button>
+    <button type="button" class="pin-key empty" disabled aria-label="Empty">&nbsp;</button>
+    <button type="button" class="pin-key" onclick="pinPress('0')">0</button>
+    <button type="button" class="pin-key backspace" onclick="pinBackspace()">&#9003;</button>
+  </div>
+  <div class="pin-error-msg" id="pinError"></div>
+</div>
+
+<div class="app" id="mainApp" style="display:none">
+
+<!-- ===== DASHBOARD ===== -->
+<div class="dashboard-page" id="dashboardPage">
+  <div class="header">
+    <div>
+      <div class="date" id="headerDate"></div>
+      <h1>Focus Mode</h1>
+    </div>
+    <button type="button" class="settings-btn" onclick="showSettings()" aria-label="Settings">&#9881;</button>
+  </div>
+
+  <div class="nav-tabs">
+    <button type="button" class="nav-tab active" onclick="switchTab(this,'summary')">Summary</button>
+    <button type="button" class="nav-tab" onclick="switchTab(this,'tasks')">Tasks</button>
+    <button type="button" class="nav-tab" onclick="switchTab(this,'apps')">Apps</button>
+    <button type="button" class="nav-tab" onclick="switchTab(this,'blocking')">Blocking</button>
+  </div>
+
+  <!-- TAB: Summary -->
+  <div id="tab-summary">
+    <div id="rewardBanners"></div>
+
+    <div id="aiReviewCard" class="ai-review-card" style="display:none">
+      <div class="ai-review-header">
+        <div class="ai-badge">AI</div>
+        <span class="ai-review-title">Daily Review</span>
+        <button type="button" class="ai-refresh-btn" onclick="refreshAIReview()" title="Generate new review">&#8635;</button>
+      </div>
+      <div class="ai-review-text" id="aiReviewText"></div>
+    </div>
+
+    <div class="summary-layout">
+    <div class="summary-left">
+    <div class="graph-section">
+      <div class="graph-header">
+        <div>
+          <div class="graph-title">Screen Time</div>
+          <div class="graph-time" id="totalTime">0h 0m</div>
+        </div>
+        <div class="graph-badges">
+          <div class="health-badge healthy" id="healthBadge">
+            <span id="healthIcon">&#9679;</span>
+            <span id="healthText">Healthy</span>
+          </div>
+          <div id="streakBadge" class="streak-badge none">No streak yet</div>
+        </div>
+      </div>
+      <div class="graph-canvas-wrap">
+        <canvas id="screenTimeCanvas"></canvas>
+      </div>
+      <div class="graph-legend">
+        <div class="graph-legend-item"><div class="legend-dot screen"></div> Screen</div>
+        <div class="graph-legend-item"><div class="legend-dot social"></div> Social</div>
+        <div class="graph-legend-item"><div class="legend-dot focus"></div> Focus</div>
+      </div>
+    </div>
+    </div>
+    <div class="summary-right">
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label stat-label-green">Screen</div>
+        <div class="stat-value" id="statScreen">0h</div>
+        <div class="stat-sub" id="statScreenSub">of 8h goal</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label stat-label-blue">Social</div>
+        <div class="stat-value" id="statSocial">0h</div>
+        <div class="stat-sub" id="statSocialSub">of 2h limit</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label stat-label-cyan">Focus</div>
+        <div class="stat-value" id="statFocus">0h</div>
+        <div class="stat-sub">productive</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Social Media Limit</span>
+        <span id="socialPct" class="social-pct">0%</span>
+      </div>
+      <div class="social-progress-row">
+        <span id="socialUsed" class="social-used">0m used</span>
+        <span id="socialLeft" class="social-left">2h remaining</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="socialProgress"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Today's Tasks</span>
+        <span id="summaryTaskPct" class="social-pct">0%</span>
+      </div>
+      <div class="task-progress-header">
+        <span id="summaryTaskCount" class="task-count">0/0 completed</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="summaryTaskProgress"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">This Week</span>
+      </div>
+      <div class="bar-chart" id="weeklyChart"></div>
+    </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- TAB: Tasks -->
+  <div id="tab-tasks" class="tab-hidden">
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Daily Tasks</span>
+          <span id="taskPct" class="social-pct">0%</span>
+        </div>
+        <div class="add-row">
+          <input type="text" class="add-input" id="taskInput" placeholder="Add a task for today...">
+          <button type="button" class="add-btn add-btn-green" onclick="addTask()">Add</button>
+        </div>
+        <div id="taskList"></div>
+        <div class="task-progress-header mt-10">
+          <span id="taskCount" class="task-count">0/0 completed</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="taskProgress"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Weekly Goals</span>
+          <span id="goalPct" class="social-pct">0%</span>
+        </div>
+        <div class="add-row">
+          <input type="text" class="add-input" id="goalInput" placeholder="Add a goal for this week...">
+          <button type="button" class="add-btn add-btn-purple" onclick="addGoal()">Add</button>
+        </div>
+        <div id="goalList"></div>
+        <div class="task-progress-header mt-10">
+          <span id="goalCount" class="task-count">0/0 completed</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="goalProgress"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: Apps -->
+  <div id="tab-apps" class="tab-hidden">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">App Usage</span>
+      </div>
+      <div id="appList"></div>
+    </div>
+  </div>
+
+  <!-- TAB: Blocking -->
+  <div id="tab-blocking" class="tab-hidden">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Protection Status</span>
+      </div>
+      <div class="status-row">
+        <div class="status-dot active" id="pornDot"></div>
+        <span class="status-label">Adult Content Blocking</span>
+        <span class="status-value" id="pornStatus">Active</span>
+      </div>
+      <div class="status-row">
+        <div class="status-dot" id="socialDot"></div>
+        <span class="status-label">Social Media Blocking</span>
+        <span class="status-value" id="socialStatus">Inactive</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">How It Works</span>
+      </div>
+      <div class="info-text">
+        <p>&#128274; <strong>Adult content</strong> is permanently blocked via your system hosts file.</p>
+        <p>&#9200; <strong>Social media</strong> sites are blocked once your daily time limit is reached.</p>
+        <p>&#128737; DNS-level blocking works across all browsers and apps.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Custom Blocked Sites</span>
+      </div>
+      <div class="add-row">
+        <input type="text" class="add-input" id="customSiteInput" placeholder="Enter domain (e.g. example.com)">
+        <button type="button" class="add-btn add-btn-blue" onclick="addCustomSite()">Block</button>
+      </div>
+      <div id="customSitesList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SETTINGS ===== -->
+<div class="settings-page" id="settingsPage">
+  <div class="header">
+    <button type="button" class="back-btn" onclick="hideSettings()">&#8592; Back</button>
+    <h1 class="settings-title">Settings</h1>
+    <div class="settings-spacer"></div>
+  </div>
+
+  <div class="setting-group">
+    <h3>Time Limits</h3>
+    <div class="setting-row setting-row-first">
+      <span class="setting-label">Social Media Limit</span>
+      <input class="setting-input" id="s_social_limit" type="number" min="0" step="30" placeholder="min" onchange="saveSetting('daily_social_limit',this.value*60)">
+    </div>
+    <div class="setting-row setting-row-last">
+      <span class="setting-label">Daily Screen Limit</span>
+      <input class="setting-input" id="s_screen_limit" type="number" min="0" step="30" placeholder="min" onchange="saveSetting('daily_screen_limit',this.value*60)">
+    </div>
+  </div>
+
+  <div class="setting-group">
+    <h3>Health Thresholds</h3>
+    <div class="setting-row setting-row-first">
+      <span class="setting-label">Healthy Threshold</span>
+      <input class="setting-input" id="s_healthy" type="number" min="0" step="30" placeholder="min" onchange="saveSetting('healthy_threshold',this.value*60)">
+    </div>
+    <div class="setting-row setting-row-last">
+      <span class="setting-label">Moderate Threshold</span>
+      <input class="setting-input" id="s_moderate" type="number" min="0" step="30" placeholder="min" onchange="saveSetting('moderate_threshold',this.value*60)">
+    </div>
+  </div>
+
+  <div class="setting-group">
+    <h3>Blocking</h3>
+    <div class="setting-row setting-row-first">
+      <span class="setting-label">Block Adult Content</span>
+      <button type="button" class="toggle" id="t_porn" onclick="toggleSetting(this,'porn_blocking')" aria-label="Toggle adult content blocking"></button>
+    </div>
+    <div class="setting-row setting-row-last">
+      <span class="setting-label">Block Social (at limit)</span>
+      <button type="button" class="toggle" id="t_social" onclick="toggleSetting(this,'social_blocking')" aria-label="Toggle social media blocking"></button>
+    </div>
+  </div>
+
+  <div class="setting-group">
+    <h3>Notifications</h3>
+    <div class="setting-row setting-row-only">
+      <span class="setting-label">Alert Interval</span>
+      <input class="setting-input" id="s_notif" type="number" min="5" step="5" placeholder="min" onchange="saveSetting('notification_interval',this.value*60)">
+    </div>
+  </div>
+
+  <div class="setting-group">
+    <h3>Security</h3>
+    <div class="setting-row setting-row-only setting-row-wrap">
+      <span class="setting-label">PIN Lock</span>
+      <div id="pinSettingArea" class="pin-setup-row">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <div class="setting-group">
+    <h3>Google Calendar</h3>
+    <div id="gcalSection" class="gcal-section-box">
+      <div class="gcal-status">
+        <div class="gcal-status-dot disconnected" id="gcalDot"></div>
+        <span id="gcalStatusText">Not connected</span>
+      </div>
+      <div id="gcalDisconnected">
+        <div class="add-row gcal-url-row">
+          <input type="text" class="add-input" id="gcalUrlInput" placeholder="Paste your iCal URL here...">
+          <button type="button" class="add-btn add-btn-blue" onclick="connectGCal()">Link</button>
+        </div>
+        <div class="gcal-info">Go to Google Calendar web &rarr; Settings &rarr; pick your calendar &rarr; scroll to "Secret address in iCal format" &rarr; copy the URL and paste it above.</div>
+      </div>
+      <div id="gcalConnected" style="display:none">
+        <div id="gcalEvents" class="gcal-events-wrap"></div>
+        <div class="gcal-actions">
+          <button type="button" class="gcal-btn gcal-sync" onclick="loadGCalEvents()">&#128260; Refresh Events</button>
+          <button type="button" class="gcal-btn gcal-disconnect" onclick="disconnectGCal()">Disconnect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var catIcons = { social_media: '\uD83D\uDCF1', browser: '\uD83C\uDF10', productivity: '\uD83D\uDCBB', other: '\uD83D\uDCCC' };
+var ALL_TABS = ['summary','tasks','apps','blocking'];
+
+function fmt(sec) {
+  var h = Math.floor(sec / 3600);
+  var m = Math.floor((sec % 3600) / 60);
+  return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+}
+function fmtShort(sec) {
+  var h = Math.floor(sec / 3600);
+  var m = Math.floor((sec % 3600) / 60);
+  return h > 0 ? h + 'h' : m + 'm';
+}
+
+/* ===== PIN LOCK ===== */
+var pinEntry = '';
+var pinMaxLen = 4;
+
+function pinPress(digit) {
+  if (pinEntry.length >= pinMaxLen) return;
+  pinEntry += digit;
+  updatePinDots();
+  if (pinEntry.length === pinMaxLen) {
+    setTimeout(function() { verifyPin(); }, 150);
+  }
+}
+function pinBackspace() {
+  if (pinEntry.length === 0) return;
+  pinEntry = pinEntry.slice(0, -1);
+  updatePinDots();
+  document.getElementById('pinError').textContent = '';
+  var dots = document.querySelectorAll('#pinDots .pin-dot');
+  for (var i = 0; i < dots.length; i++) dots[i].classList.remove('error');
+}
+function updatePinDots() {
+  var dots = document.querySelectorAll('#pinDots .pin-dot');
+  for (var i = 0; i < dots.length; i++) {
+    dots[i].classList.toggle('filled', i < pinEntry.length);
+  }
+}
+function verifyPin() {
+  pywebview.api.verify_pin(pinEntry).then(function(raw) {
+    var r = JSON.parse(raw);
+    if (r.ok) {
+      document.getElementById('lockScreen').classList.add('hidden');
+      document.getElementById('mainApp').style.display = '';
+      refresh();
+      loadGoals();
+    } else {
+      var dots = document.querySelectorAll('#pinDots .pin-dot');
+      for (var i = 0; i < dots.length; i++) dots[i].classList.add('error');
+      document.getElementById('pinError').textContent = 'Wrong PIN. Try again.';
+      pinEntry = '';
+      setTimeout(function() {
+        for (var i = 0; i < dots.length; i++) { dots[i].classList.remove('error'); dots[i].classList.remove('filled'); }
+      }, 600);
+    }
+  });
+}
+function checkPinLock() {
+  pywebview.api.has_pin().then(function(raw) {
+    var r = JSON.parse(raw);
+    if (r.has_pin) {
+      document.getElementById('lockScreen').classList.remove('hidden');
+      document.getElementById('mainApp').style.display = 'none';
+    } else {
+      document.getElementById('lockScreen').classList.add('hidden');
+      document.getElementById('mainApp').style.display = '';
+      refresh();
+      loadGoals();
+    }
+  });
+}
+
+/* ===== PIN SETTINGS ===== */
+function loadPinSetting() {
+  pywebview.api.has_pin().then(function(raw) {
+    var r = JSON.parse(raw);
+    var area = document.getElementById('pinSettingArea');
+    if (r.has_pin) {
+      area.innerHTML = '<span class="pin-status-text">PIN is set</span><button type="button" class="pin-setting-btn remove" onclick="removePin()">Remove</button>';
+    } else {
+      area.innerHTML = '<input type="password" class="pin-setup-input" id="newPinInput" placeholder="4+ digits" maxlength="8" inputmode="numeric" pattern="[0-9]*"><button type="button" class="pin-setting-btn set" onclick="setNewPin()">Set PIN</button>';
+    }
+  });
+}
+function setNewPin() {
+  var input = document.getElementById('newPinInput');
+  var pin = input.value.trim();
+  if (pin.length < 4 || !/^\d+$/.test(pin)) {
+    alert('PIN must be at least 4 digits (numbers only).');
+    return;
+  }
+  pywebview.api.set_pin(pin).then(function(raw) {
+    var r = JSON.parse(raw);
+    if (r.ok) { loadPinSetting(); }
+    else { alert(r.error || 'Failed to set PIN'); }
+  });
+}
+function removePin() {
+  pywebview.api.remove_pin().then(function() { loadPinSetting(); });
+}
+
+/* ===== TAB SWITCHING ===== */
+function switchTab(el, tab) {
+  var tabs = document.querySelectorAll('.nav-tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  el.classList.add('active');
+  for (var j = 0; j < ALL_TABS.length; j++) {
+    var t = document.getElementById('tab-' + ALL_TABS[j]);
+    if (ALL_TABS[j] === tab) t.classList.remove('tab-hidden');
+    else t.classList.add('tab-hidden');
+  }
+  if (tab === 'tasks') { loadTasks(); loadGoals(); }
+}
+
+/* ===== SETTINGS ===== */
+function showSettings() {
+  document.getElementById('dashboardPage').classList.add('hidden');
+  document.getElementById('settingsPage').classList.add('visible');
+  loadSettings();
+  loadGCalStatus();
+  loadPinSetting();
+}
+function hideSettings() {
+  document.getElementById('settingsPage').classList.remove('visible');
+  document.getElementById('dashboardPage').classList.remove('hidden');
+}
+function loadSettings() {
+  pywebview.api.get_settings().then(function(raw) {
+    var s = JSON.parse(raw);
+    document.getElementById('s_social_limit').value = Math.round(parseInt(s.daily_social_limit) / 60);
+    document.getElementById('s_screen_limit').value = Math.round(parseInt(s.daily_screen_limit) / 60);
+    document.getElementById('s_healthy').value = Math.round(parseInt(s.healthy_threshold) / 60);
+    document.getElementById('s_moderate').value = Math.round(parseInt(s.moderate_threshold) / 60);
+    document.getElementById('s_notif').value = Math.round(parseInt(s.notification_interval) / 60);
+    setToggle('t_porn', s.porn_blocking === 'true');
+    setToggle('t_social', s.social_blocking === 'true');
+  });
+}
+function setToggle(id, on) {
+  var el = document.getElementById(id);
+  if (on) el.classList.add('on'); else el.classList.remove('on');
+}
+function toggleSetting(btn, key) {
+  var isOn = btn.classList.toggle('on');
+  pywebview.api.update_setting(key, isOn ? 'true' : 'false');
+}
+function saveSetting(key, value) {
+  pywebview.api.update_setting(key, String(Math.max(0, parseInt(value) || 0)));
+}
+
+/* ===== CUSTOM SITES ===== */
+function addCustomSite() {
+  var input = document.getElementById('customSiteInput');
+  var url = input.value.trim();
+  if (!url) return;
+  pywebview.api.add_custom_blocked_site(url).then(function() { input.value = ''; loadCustomSites(); });
+}
+function removeCustomSite(domain) {
+  pywebview.api.remove_custom_blocked_site(domain).then(function() { loadCustomSites(); });
+}
+function loadCustomSites() {
+  pywebview.api.get_custom_blocked_sites().then(function(raw) {
+    var sites = JSON.parse(raw);
+    var el = document.getElementById('customSitesList');
+    el.innerHTML = '';
+    if (sites.length === 0) {
+      el.innerHTML = '<div class="empty-state">No custom sites blocked yet</div>';
+    } else {
+      for (var i = 0; i < sites.length; i++) {
+        var row = document.createElement('div');
+        row.className = 'custom-site-item';
+        var d = document.createElement('span');
+        d.className = 'custom-site-domain';
+        d.textContent = sites[i];
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'custom-site-remove';
+        btn.textContent = '\u2715';
+        (function(dm) { btn.onclick = function() { removeCustomSite(dm); }; })(sites[i]);
+        row.appendChild(d);
+        row.appendChild(btn);
+        el.appendChild(row);
+      }
+    }
+  });
+}
+
+/* ===== TASKS ===== */
+function addTask() {
+  var input = document.getElementById('taskInput');
+  var title = input.value.trim();
+  if (!title) return;
+  pywebview.api.add_task(title).then(function() { input.value = ''; loadTasks(); });
+}
+function toggleTask(id) { pywebview.api.toggle_task(id).then(function() { loadTasks(); }); }
+function deleteTask(id) { pywebview.api.delete_task(id).then(function() { loadTasks(); }); }
+function loadTasks() {
+  pywebview.api.get_tasks().then(function(raw) {
+    var data = JSON.parse(raw);
+    var el = document.getElementById('taskList');
+    el.innerHTML = '';
+    if (data.tasks.length === 0) {
+      el.innerHTML = '<div class="empty-state">No tasks for today. Add one above!</div>';
+    } else {
+      for (var i = 0; i < data.tasks.length; i++) {
+        var t = data.tasks[i];
+        var row = document.createElement('div'); row.className = 'item-row';
+        var check = document.createElement('button'); check.type = 'button';
+        check.className = 'item-check' + (t.completed ? ' done' : '');
+        check.textContent = t.completed ? '\u2713' : '';
+        (function(tid) { check.onclick = function() { toggleTask(tid); }; })(t.id);
+        var text = document.createElement('span');
+        text.className = 'item-text' + (t.completed ? ' done' : '');
+        text.textContent = t.title;
+        var del = document.createElement('button'); del.type = 'button'; del.className = 'item-delete'; del.textContent = '\u2715';
+        (function(tid) { del.onclick = function() { deleteTask(tid); }; })(t.id);
+        row.appendChild(check); row.appendChild(text); row.appendChild(del);
+        el.appendChild(row);
+      }
+    }
+    var pct = Math.round(data.rate * 100);
+    document.getElementById('taskPct').textContent = pct + '%';
+    document.getElementById('taskCount').textContent = data.done + '/' + data.total + ' completed';
+    var p = document.getElementById('taskProgress');
+    p.style.width = pct + '%';
+    p.style.background = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--blue)';
+    document.getElementById('summaryTaskPct').textContent = pct + '%';
+    document.getElementById('summaryTaskCount').textContent = data.done + '/' + data.total + ' completed';
+    var sp = document.getElementById('summaryTaskProgress');
+    sp.style.width = pct + '%';
+    sp.style.background = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--blue)';
+  });
+}
+
+/* ===== WEEKLY GOALS ===== */
+function addGoal() {
+  var input = document.getElementById('goalInput');
+  var title = input.value.trim();
+  if (!title) return;
+  pywebview.api.add_weekly_goal(title).then(function() { input.value = ''; loadGoals(); });
+}
+function toggleGoal(id) { pywebview.api.toggle_weekly_goal(id).then(function() { loadGoals(); }); }
+function deleteGoal(id) { pywebview.api.delete_weekly_goal(id).then(function() { loadGoals(); }); }
+function loadGoals() {
+  pywebview.api.get_weekly_goals().then(function(raw) {
+    var data = JSON.parse(raw);
+    var el = document.getElementById('goalList');
+    el.innerHTML = '';
+    if (data.goals.length === 0) {
+      el.innerHTML = '<div class="empty-state">No weekly goals set. Add one above!</div>';
+    } else {
+      for (var i = 0; i < data.goals.length; i++) {
+        var g = data.goals[i];
+        var row = document.createElement('div'); row.className = 'item-row';
+        var check = document.createElement('button'); check.type = 'button';
+        check.className = 'item-check goal' + (g.completed ? ' done' : '');
+        check.textContent = g.completed ? '\u2713' : '';
+        (function(gid) { check.onclick = function() { toggleGoal(gid); }; })(g.id);
+        var text = document.createElement('span');
+        text.className = 'item-text' + (g.completed ? ' done' : '');
+        text.textContent = g.title;
+        var del = document.createElement('button'); del.type = 'button'; del.className = 'item-delete'; del.textContent = '\u2715';
+        (function(gid) { del.onclick = function() { deleteGoal(gid); }; })(g.id);
+        row.appendChild(check); row.appendChild(text); row.appendChild(del);
+        el.appendChild(row);
+      }
+    }
+    var pct = Math.round(data.rate * 100);
+    document.getElementById('goalPct').textContent = pct + '%';
+    document.getElementById('goalCount').textContent = data.done + '/' + data.total + ' completed';
+    var p = document.getElementById('goalProgress');
+    p.style.width = pct + '%';
+    p.style.background = pct >= 100 ? 'var(--purple)' : pct >= 50 ? 'var(--orange)' : 'var(--blue)';
+  });
+}
+
+/* ===== ENTER KEY ===== */
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    if (document.activeElement.id === 'taskInput') addTask();
+    else if (document.activeElement.id === 'goalInput') addGoal();
+    else if (document.activeElement.id === 'customSiteInput') addCustomSite();
+    else if (document.activeElement.id === 'newPinInput') setNewPin();
+  }
+});
+
+/* ===== GOOGLE CALENDAR (iCal) ===== */
+function loadGCalStatus() {
+  pywebview.api.gcal_status().then(function(raw) {
+    var s = JSON.parse(raw);
+    var dot = document.getElementById('gcalDot');
+    var txt = document.getElementById('gcalStatusText');
+    var disc = document.getElementById('gcalDisconnected');
+    var conn = document.getElementById('gcalConnected');
+    if (s.connected) {
+      dot.className = 'gcal-status-dot connected';
+      txt.textContent = 'Connected to Google Calendar';
+      disc.style.display = 'none';
+      conn.style.display = 'block';
+      loadGCalEvents();
+    } else {
+      dot.className = 'gcal-status-dot disconnected';
+      txt.textContent = 'Not connected';
+      disc.style.display = 'block';
+      conn.style.display = 'none';
+    }
+  });
+}
+function connectGCal() {
+  var url = document.getElementById('gcalUrlInput').value.trim();
+  if (!url) { alert('Please paste your iCal URL first.'); return; }
+  pywebview.api.gcal_connect(url).then(function(raw) {
+    var r = JSON.parse(raw);
+    if (r.ok) {
+      document.getElementById('gcalUrlInput').value = '';
+      loadGCalStatus();
+    } else {
+      alert(r.message || 'Failed to connect.');
+    }
+  });
+}
+function disconnectGCal() {
+  pywebview.api.gcal_disconnect().then(function() { loadGCalStatus(); });
+}
+function loadGCalEvents() {
+  pywebview.api.gcal_get_today().then(function(raw) {
+    var r = JSON.parse(raw);
+    var el = document.getElementById('gcalEvents');
+    if (!r.events || r.events.length === 0) {
+      el.innerHTML = '<div style="color:var(--text2);font-size:13px;">No events today</div>';
+      return;
+    }
+    var html = '<div style="font-size:13px;color:var(--text2);margin-bottom:6px;">Today\'s Events</div>';
+    for (var i = 0; i < r.events.length; i++) {
+      var ev = r.events[i];
+      var timeStr = ev.all_day ? 'All day' : (ev.start || '') + (ev.end ? ' - ' + ev.end : '');
+      html += '<div style="background:var(--bg);padding:8px 10px;border-radius:8px;margin-bottom:4px;font-size:13px;">'
+        + '<div style="font-weight:600;">' + escHtml(ev.summary) + '</div>'
+        + '<div style="color:var(--text2);font-size:11px;">' + escHtml(timeStr) + '</div>'
+        + '</div>';
+    }
+    el.innerHTML = html;
+  });
+}
+
+/* ===== SCREEN TIME LINE GRAPH ===== */
+function drawScreenTimeGraph(hourly) {
+  var canvas = document.getElementById('screenTimeCanvas');
+  if (!canvas) return;
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  var w = rect.width, h = rect.height;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Ensure 24-hour data
+  while (hourly.length < 24) hourly.push(0);
+  var currentHour = new Date().getHours();
+  var visible = hourly.slice(0, currentHour + 1);
+  if (visible.length === 0) visible = [0];
+
+  var maxVal = Math.max.apply(null, visible);
+  if (maxVal < 60) maxVal = 60;
+  maxVal *= 1.15;
+
+  var padL = 36, padR = 12, padT = 8, padB = 22;
+  var gw = w - padL - padR, gh = h - padT - padB;
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  for (var g = 0; g <= 4; g++) {
+    var gy = padT + gh - (g / 4) * gh;
+    ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(w - padR, gy); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '10px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    var mins = Math.round((g / 4) * maxVal / 60);
+    ctx.fillText(mins + 'm', padL - 4, gy + 3);
+  }
+
+  // X-axis labels
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.textAlign = 'center';
+  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  var labels = [0, 6, 12, 18, 23];
+  for (var li = 0; li < labels.length; li++) {
+    var lx = padL + (labels[li] / 23) * gw;
+    var lt = labels[li] === 0 ? '12a' : labels[li] === 6 ? '6a' : labels[li] === 12 ? '12p' : labels[li] === 18 ? '6p' : '11p';
+    ctx.fillText(lt, lx, h - 4);
+  }
+
+  if (visible.length < 2) return;
+
+  // Build points
+  var points = [];
+  for (var pi = 0; pi < visible.length; pi++) {
+    var px = padL + (pi / 23) * gw;
+    var py = padT + gh - (visible[pi] / maxVal) * gh;
+    points.push({ x: px, y: py });
+  }
+
+  // Gradient fill
+  var grad = ctx.createLinearGradient(0, padT, 0, padT + gh);
+  grad.addColorStop(0, 'rgba(48,209,88,0.35)');
+  grad.addColorStop(0.5, 'rgba(10,132,255,0.15)');
+  grad.addColorStop(1, 'rgba(100,210,255,0.02)');
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, padT + gh);
+  ctx.lineTo(points[0].x, points[0].y);
+  for (var fi = 1; fi < points.length; fi++) {
+    var cpx = (points[fi - 1].x + points[fi].x) / 2;
+    ctx.bezierCurveTo(cpx, points[fi - 1].y, cpx, points[fi].y, points[fi].x, points[fi].y);
+  }
+  ctx.lineTo(points[points.length - 1].x, padT + gh);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  var lineGrad = ctx.createLinearGradient(padL, 0, padL + gw, 0);
+  lineGrad.addColorStop(0, '#30d158');
+  lineGrad.addColorStop(0.5, '#0a84ff');
+  lineGrad.addColorStop(1, '#64d2ff');
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (var di = 1; di < points.length; di++) {
+    var cpx2 = (points[di - 1].x + points[di].x) / 2;
+    ctx.bezierCurveTo(cpx2, points[di - 1].y, cpx2, points[di].y, points[di].x, points[di].y);
+  }
+  ctx.strokeStyle = lineGrad;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Current hour dot glow
+  var last = points[points.length - 1];
+  ctx.beginPath();
+  ctx.arc(last.x, last.y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(100,210,255,0.25)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(last.x, last.y, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#64d2ff';
+  ctx.fill();
+}
+
+// Redraw graph on window resize
+window.addEventListener('resize', function() {
+  if (window._lastHourly) drawScreenTimeGraph(window._lastHourly);
+});
+
+/* ===== MAIN REFRESH ===== */
+function refresh() {
+  pywebview.api.get_dashboard().then(function(raw) {
+    var d = JSON.parse(raw);
+
+    // Date
+    var now = new Date();
+    document.getElementById('headerDate').textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+    // Line Graph
+    var screenPct = Math.min(d.total_screen_time / d.screen_limit, 1);
+    var socialPct = Math.min(d.social_media_time / d.social_limit, 1);
+    var focus = (d.usage_by_category.productivity || 0);
+
+    document.getElementById('totalTime').textContent = fmt(d.total_screen_time);
+
+    // Fetch hourly data & draw graph
+    pywebview.api.get_hourly_screen_time().then(function(hRaw) {
+      var hd = JSON.parse(hRaw);
+      window._lastHourly = hd.hourly || [];
+      drawScreenTimeGraph(window._lastHourly);
+    });
+
+    // Health badge
+    var badge = document.getElementById('healthBadge');
+    badge.className = 'health-badge ' + d.health_status;
+    document.getElementById('healthText').textContent = ({ healthy:'Healthy', moderate:'Moderate', unhealthy:'Unhealthy' })[d.health_status];
+
+    // Streak
+    var streakEl = document.getElementById('streakBadge');
+    if (d.streak > 0) { streakEl.className = 'streak-badge'; streakEl.textContent = '\uD83D\uDD25 ' + d.streak + '-day streak'; }
+    else { streakEl.className = 'streak-badge none'; streakEl.textContent = 'No streak yet'; }
+
+    // Stats
+    document.getElementById('statScreen').textContent = fmtShort(d.total_screen_time);
+    document.getElementById('statScreenSub').textContent = 'of ' + fmtShort(d.screen_limit) + ' goal';
+    document.getElementById('statSocial').textContent = fmtShort(d.social_media_time);
+    document.getElementById('statSocialSub').textContent = 'of ' + fmtShort(d.social_limit) + ' limit';
+    document.getElementById('statFocus').textContent = fmtShort(focus);
+
+    // Social progress
+    var socialColor = socialPct >= 1 ? 'var(--red)' : socialPct > 0.7 ? 'var(--orange)' : 'var(--blue)';
+    var sPct = Math.round(socialPct * 100);
+    document.getElementById('socialPct').textContent = sPct + '%';
+    document.getElementById('socialUsed').textContent = fmt(d.social_media_time) + ' used';
+    document.getElementById('socialLeft').textContent = fmt(Math.max(0, d.social_limit - d.social_media_time)) + ' remaining';
+    var sp = document.getElementById('socialProgress');
+    sp.style.width = Math.min(sPct, 100) + '%';
+    sp.style.background = socialColor;
+
+    // Rewards
+    var bannersEl = document.getElementById('rewardBanners');
+    bannersEl.innerHTML = '';
+    if (d.today_rewards && d.today_rewards.length > 0) {
+      for (var r = 0; r < d.today_rewards.length; r++) {
+        var reward = d.today_rewards[r];
+        var isW = reward.reward_type === 'weekly_goals';
+        var b = document.createElement('div');
+        b.className = 'reward-banner' + (isW ? ' weekly' : '');
+        b.innerHTML = '<div class="reward-icon">' + (isW ? '\uD83C\uDFC6' : '\uD83C\uDF1F') + '</div><div class="reward-title">' + (isW ? 'Weekly Champion!' : 'Daily Goal Achieved!') + '</div><div class="reward-msg">' + escHtml(reward.message) + '</div>';
+        bannersEl.appendChild(b);
+      }
+    }
+
+    // Weekly chart
+    var chartEl = document.getElementById('weeklyChart');
+    chartEl.innerHTML = '';
+    var wTotals = d.weekly.map(function(w) { return w.total; });
+    wTotals.push(3600);
+    var maxW = Math.max.apply(null, wTotals);
+    for (var i = 6; i >= 0; i--) {
+      var dt = new Date(); dt.setDate(dt.getDate() - i);
+      var key = dt.toISOString().slice(0, 10);
+      var entry = null;
+      for (var k = 0; k < d.weekly.length; k++) { if (d.weekly[k].date === key) { entry = d.weekly[k]; break; } }
+      var val = entry ? entry.total : 0;
+      var pct = Math.max(4, (val / maxW) * 100);
+      var col = document.createElement('div'); col.className = 'bar-col';
+      var bar = document.createElement('div'); bar.className = 'bar'; bar.style.height = pct + '%'; bar.style.background = i === 0 ? 'var(--green)' : 'var(--card2)';
+      var lbl = document.createElement('div'); lbl.className = 'bar-label'; lbl.textContent = days[dt.getDay()];
+      col.appendChild(bar); col.appendChild(lbl); chartEl.appendChild(col);
+    }
+
+    // App list
+    var listEl = document.getElementById('appList');
+    listEl.innerHTML = '';
+    if (d.top_apps.length === 0) {
+      listEl.innerHTML = '<div class="app-empty">No activity tracked yet</div>';
+    } else {
+      for (var a = 0; a < d.top_apps.length; a++) {
+        var app = d.top_apps[a];
+        var cat = app.category || 'other';
+        var item = document.createElement('div'); item.className = 'app-item';
+        var iconEl = document.createElement('div'); iconEl.className = 'app-icon'; iconEl.textContent = catIcons[cat] || '\uD83D\uDCCC';
+        var infoEl = document.createElement('div'); infoEl.className = 'app-info';
+        var nameEl = document.createElement('div'); nameEl.className = 'app-name'; nameEl.textContent = app.app_name;
+        var catEl = document.createElement('div'); catEl.className = 'app-cat'; catEl.textContent = cat.replace('_', ' ');
+        infoEl.appendChild(nameEl); infoEl.appendChild(catEl);
+        var timeEl = document.createElement('div'); timeEl.className = 'app-time'; timeEl.textContent = fmt(app.total);
+        item.appendChild(iconEl); item.appendChild(infoEl); item.appendChild(timeEl);
+        listEl.appendChild(item);
+      }
+    }
+
+    // Blocking status
+    document.getElementById('pornDot').className = 'status-dot active';
+    document.getElementById('pornStatus').textContent = 'Active';
+    document.getElementById('socialDot').className = 'status-dot ' + (d.social_blocked ? 'blocked' : '');
+    document.getElementById('socialStatus').textContent = d.social_blocked ? 'Blocked (limit reached)' : 'Monitoring';
+
+    // Load sub-data
+    loadCustomSites();
+    loadTasks();
+
+    // AI Review — load once per session
+    if (!window._aiLoaded) {
+      window._aiLoaded = true;
+      refreshAIReview();
+    }
+  }).catch(function(e) { console.error('Refresh error:', e); });
+}
+
+function refreshAIReview() {
+  var btn = document.querySelector('.ai-refresh-btn');
+  if (btn) btn.classList.add('spinning');
+  pywebview.api.get_ai_review().then(function(raw) {
+    var data = JSON.parse(raw);
+    var card = document.getElementById('aiReviewCard');
+    var text = document.getElementById('aiReviewText');
+    if (data.review) {
+      text.textContent = data.review;
+      card.style.display = '';
+    }
+    setTimeout(function() { if (btn) btn.classList.remove('spinning'); }, 600);
+  }).catch(function(e) {
+    console.error('AI review error:', e);
+    if (btn) btn.classList.remove('spinning');
+  });
+}
+
+function escHtml(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// Auto-refresh every 5 seconds
+setInterval(refresh, 5000);
+
+// Initial load
+window.addEventListener('pywebviewready', function() {
+  checkPinLock();
+});
+</script>
+</body>
+</html>

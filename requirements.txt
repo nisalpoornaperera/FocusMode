@@ -1,0 +1,7 @@
+pywebview==5.3.2
+psutil==6.1.1
+pywin32==308
+plyer==2.1.0
+google-api-python-client>=2.100.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.2.0
