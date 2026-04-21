@@ -136,13 +136,19 @@ class ScreenTimeTracker:
         # Social-media limit
         social = self.db.get_social_media_time_today()
         limit = int(self.db.get_setting("daily_social_limit") or 7200)
-        if social >= limit and self.db.get_setting("social_blocking") == "true":
+        social_blocking_enabled = self.db.get_setting("social_blocking") == "true"
+        
+        # Apply blocks if over limit and blocking enabled
+        if social >= limit and social_blocking_enabled:
             self.blocker.apply_social_blocks()
             if social == limit or (social - limit) < 4:
                 self.notifier.notify(
                     "Social Media Limit Reached",
                     f"You've used {self._fmt(social)} of social media today. Sites are now blocked.",
                 )
+        # Remove blocks if under limit and currently blocked
+        elif social < limit and self.blocker.is_social_blocked():
+            self.blocker.remove_social_blocks()
 
         # Screen-time health notification
         total = self.db.get_total_screen_time_today()

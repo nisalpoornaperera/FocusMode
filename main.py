@@ -228,6 +228,27 @@ def uninstall_app():
     sys.exit(0)
 
 
+def cleanup_stuck_blocks():
+    """Remove any stuck YouTube/social media blocks from hosts file at startup."""
+    try:
+        hosts_path = r"C:\Windows\System32\drivers\etc\hosts"
+        with open(hosts_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        # Remove any FocusMode-SOCIAL entries that shouldn't be there
+        lines = content.split("\n")
+        filtered = [l for l in lines if "# FocusMode-SOCIAL" not in l]
+        new_content = "\n".join(filtered)
+        
+        if new_content != content:
+            with open(hosts_path, "w", encoding="utf-8") as f:
+                f.write(new_content)
+            os.system("ipconfig /flushdns >nul 2>&1")
+    except Exception:
+        # Silently fail - hosts cleanup is not critical
+        pass
+
+
 def main():
     if not is_admin():
         args = " ".join(sys.argv[1:]) if getattr(sys, "frozen", False) else ""
@@ -249,6 +270,9 @@ def main():
     if getattr(sys, "frozen", False) and running_from_install_dir():
         register_uninstall()
         add_to_startup()
+
+    # Clean up any stuck hosts file entries from previous crashes
+    cleanup_stuck_blocks()
 
     api = Api()
     api.start()
