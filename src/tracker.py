@@ -23,6 +23,7 @@ PRODUCTIVITY_KEYWORDS = [
     "visual studio", "vscode", "code.exe", "pycharm", "intellij",
     "eclipse", "word", "excel", "powerpoint", "outlook",
     "notion", "obsidian", "terminal", "cmd", "powershell",
+    "acrobat", "acrord32", "xournal+", "xournal",
 ]
 
 
@@ -94,7 +95,8 @@ class ScreenTimeTracker:
             for kw in SOCIAL_KEYWORDS:
                 if kw in title_l:
                     return "social_media"
-            return "browser"
+            # Non-social browsing is considered productive
+            return "productivity"
         for kw in PRODUCTIVITY_KEYWORDS:
             if kw in title_l or kw in app_l:
                 return "productivity"
